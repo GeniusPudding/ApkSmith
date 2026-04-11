@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "apksmith"
+version = "0.0.1"
+description = "A smali-level Android APK rewriting toolchain: decompile, inject arbitrary behaviour, repack, resign, and install."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "geniuspudding" }]
+requires-python = ">=3.11"
+keywords = ["android", "smali", "apk", "instrumentation", "bytecode", "reverse-engineering"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Disassemblers",
+]
+dependencies = [
+    "tqdm>=4.65",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.4",
+    "mypy>=1.8",
+]
+
+[project.scripts]
+apksmith = "apksmith.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/geniuspudding/ApkSmith"
+Issues = "https://github.com/geniuspudding/ApkSmith/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/apksmith"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/apksmith/resources" = "apksmith/resources"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
