@@ -31,4 +31,8 @@ Thumbs.db
 work/
 out/
 *.apk
-!tests/fixtures/*.apk
+
+# E2E fixtures — built locally by developers, not committed
+tests/e2e/fixtures/hello_app.apk
+tests/e2e/fixtures/hello_app/build/
+tests/e2e/fixtures/debug.keystore

@@ -58,3 +58,6 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -q"
+markers = [
+    "e2e: end-to-end tests that require an Android emulator or device (auto-skip if missing)",
+]
