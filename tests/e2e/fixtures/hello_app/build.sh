@@ -38,35 +38,49 @@ mkdir -p "$BUILD/classes" "$BUILD/dex"
 
 # 1. Compile Java sources to .class
 echo "[1/6] javac"
-javac -source 11 -target 11 \
-    -bootclasspath "$ANDROID_JAR" \
+javac -source 1.8 -target 1.8 \
+    -classpath "$ANDROID_JAR" \
     -d "$BUILD/classes" \
     "$SCRIPT_DIR/src/main/java/com/apksmith/test/"*.java
 
+# Helper: find the right executable (some are .exe, some .bat on Windows)
+_tool() {
+    local base="$BUILD_TOOLS/$1"
+    if [[ -f "$base" ]]; then echo "$base"
+    elif [[ -f "$base.exe" ]]; then echo "$base.exe"
+    elif [[ -f "$base.bat" ]]; then echo "$base.bat"
+    else echo "$base"; fi
+}
+
 # 2. Convert .class -> classes.dex
 echo "[2/6] d8"
-"$BUILD_TOOLS/d8" \
+"$(_tool d8)" \
     --lib "$ANDROID_JAR" \
     --output "$BUILD/dex" \
     $(find "$BUILD/classes" -name "*.class")
 
 # 3. aapt2 link to produce an APK with manifest (no resources for this minimal app)
 echo "[3/6] aapt2 link"
-"$BUILD_TOOLS/aapt2" link \
+"$(_tool aapt2)" link \
     -I "$ANDROID_JAR" \
     --manifest "$SCRIPT_DIR/AndroidManifest.xml" \
     --min-sdk-version 21 \
     --target-sdk-version 34 \
     -o "$BUILD/base.apk"
 
-# 4. Add classes.dex into the APK
+# 4. Add classes.dex into the APK (use Python since `zip` may not be on PATH on Windows)
 echo "[4/6] inject classes.dex"
-cp "$BUILD/dex/classes.dex" "$BUILD/"
-( cd "$BUILD" && zip -j base.apk classes.dex )
+_BUILD_WIN="$(cygpath -w "$BUILD" 2>/dev/null || echo "$BUILD")"
+python -c "
+import zipfile, os
+build = os.path.normpath(r'${_BUILD_WIN}')
+with zipfile.ZipFile(os.path.join(build, 'base.apk'), 'a') as z:
+    z.write(os.path.join(build, 'dex', 'classes.dex'), 'classes.dex')
+"
 
 # 5. zipalign
 echo "[5/6] zipalign"
-"$BUILD_TOOLS/zipalign" -f 4 "$BUILD/base.apk" "$BUILD/aligned.apk"
+"$(_tool zipalign)" -f 4 "$BUILD/base.apk" "$BUILD/aligned.apk"
 
 # 6. Sign (generate debug keystore if missing)
 KEYSTORE="$FIXTURE_DIR/debug.keystore"
@@ -80,7 +94,7 @@ if [[ ! -f "$KEYSTORE" ]]; then
 fi
 
 echo "[6/6] apksigner"
-"$BUILD_TOOLS/apksigner" sign \
+"$(_tool apksigner)" sign \
     --ks "$KEYSTORE" \
     --ks-pass pass:changeit \
     --key-pass pass:changeit \
