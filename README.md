@@ -21,7 +21,110 @@ the idea, ApkSmith handles the toolchain.
 
 ## Quick start
 
-### 1. Install
+### 0. Install the Android toolchain
+
+ApkSmith needs Java, the Android SDK tools, and apktool. If you
+already have Android Studio installed, most of these are already on
+your machine — skip to step 1 and run `apksmith doctor` to check.
+
+If starting from scratch, here's a fully command-line setup (no
+Android Studio needed). Adjust paths for your OS.
+
+<details>
+<summary><strong>Windows (PowerShell)</strong></summary>
+
+```powershell
+# Pick an install root (any drive, not just C:)
+$root = "D:\android"
+New-Item -ItemType Directory -Force $root
+
+# 1. Portable JDK 17
+Invoke-WebRequest -Uri "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.13%2B11/OpenJDK17U-jdk_x64_windows_hotspot_17.0.13_11.zip" -OutFile "$root\jdk.zip"
+Expand-Archive "$root\jdk.zip" -DestinationPath $root -Force
+Rename-Item (Get-ChildItem $root -Directory "jdk-17.*").FullName "$root\jdk-17"
+Remove-Item "$root\jdk.zip"
+
+# 2. Android cmdline-tools
+New-Item -ItemType Directory -Force "$root\sdk\cmdline-tools"
+Invoke-WebRequest -Uri "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip" -OutFile "$root\clt.zip"
+Expand-Archive "$root\clt.zip" -DestinationPath "$root\sdk\cmdline-tools" -Force
+Rename-Item "$root\sdk\cmdline-tools\cmdline-tools" "$root\sdk\cmdline-tools\latest"
+Remove-Item "$root\clt.zip"
+
+# 3. Set up environment for this session
+$env:JAVA_HOME = "$root\jdk-17"
+$env:ANDROID_HOME = "$root\sdk"
+$env:PATH = "$env:JAVA_HOME\bin;$env:ANDROID_HOME\cmdline-tools\latest\bin;$env:PATH"
+
+# 4. Install SDK components (accept license when prompted)
+echo "y" | sdkmanager --sdk_root="$env:ANDROID_HOME" "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+
+# 5. (Optional) Emulator for E2E testing
+echo "y" | sdkmanager --sdk_root="$env:ANDROID_HOME" "emulator" "system-images;android-34;google_apis;x86_64"
+New-Item -ItemType Directory -Force "$root\avd"
+$env:ANDROID_AVD_HOME = "$root\avd"
+
+# 6. Apktool
+New-Item -ItemType Directory -Force "$root\apktool"
+Invoke-WebRequest -Uri "https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.10.0.jar" -OutFile "$root\apktool\apktool.jar"
+@"
+@echo off
+"%~dp0..\jdk-17\bin\java.exe" -jar "%~dp0apktool.jar" %*
+"@ | Out-File -Encoding ascii "$root\apktool\apktool.bat"
+
+# 7. Add everything to PATH
+$env:PATH = "$root\apktool;$env:ANDROID_HOME\platform-tools;$env:ANDROID_HOME\build-tools\34.0.0;$env:ANDROID_HOME\emulator;$env:PATH"
+
+# Verify
+java -version; adb version; apktool --version
+```
+
+To reload the environment in a new PowerShell session later:
+
+```powershell
+. D:\android\env.ps1
+```
+
+</details>
+
+<details>
+<summary><strong>Linux / macOS / WSL (bash)</strong></summary>
+
+```bash
+ROOT=~/android
+
+# JDK 17 (use your package manager or download from adoptium.net)
+# Ubuntu:  sudo apt install openjdk-17-jdk
+# macOS:   brew install openjdk@17
+
+# Android cmdline-tools
+mkdir -p $ROOT/sdk/cmdline-tools
+wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/clt.zip
+unzip /tmp/clt.zip -d $ROOT/sdk/cmdline-tools
+mv $ROOT/sdk/cmdline-tools/cmdline-tools $ROOT/sdk/cmdline-tools/latest
+
+export ANDROID_HOME=$ROOT/sdk
+export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+
+yes | sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+# Optional: emulator
+yes | sdkmanager "emulator" "system-images;android-34;google_apis;x86_64"
+
+# Apktool
+mkdir -p $ROOT/apktool
+wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.10.0.jar -O $ROOT/apktool/apktool.jar
+echo '#!/bin/bash' > $ROOT/apktool/apktool
+echo 'java -jar "$(dirname "$0")/apktool.jar" "$@"' >> $ROOT/apktool/apktool
+chmod +x $ROOT/apktool/apktool
+
+export PATH=$ROOT/apktool:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/34.0.0:$ANDROID_HOME/emulator:$PATH
+```
+
+To reload in a new session: `source ~/android/env.sh`
+
+</details>
+
+### 1. Install ApkSmith
 
 ```bash
 git clone https://github.com/GeniusPudding/ApkSmith.git
@@ -35,50 +138,45 @@ pip install -e .
 apksmith doctor
 ```
 
-This prints a table showing which tools are installed and which are
-missing. You need all of these on `PATH`:
-
-| Tool | What it does | Where to get it |
-|---|---|---|
-| Python >= 3.11 | Runs ApkSmith | python.org / pyenv |
-| Java >= 11 | Runs apktool & apksigner | adoptium.net |
-| `adb` | Talks to your phone | Android SDK platform-tools |
-| `apktool` | Decompiles & repacks APKs | https://apktool.org |
-| `zipalign` | Aligns the APK for Android | Android SDK build-tools |
-| `apksigner` | Signs the APK | Android SDK build-tools |
+All required tools should show ✓. If anything is missing, see step 0.
 
 ### 3. Generate a signing key (one time)
-
-Android requires every APK to be signed. Since you don't have the
-original developer's key, you sign with your own:
 
 ```bash
 ./scripts/gen_dev_keystore.sh
 ```
 
-This creates `dev.keystore` with password `changeit`. You only need
-to do this once.
+Creates `dev.keystore` with password `changeit`. Only needed once.
 
-### 4. Connect your phone
+### 4. Connect a device or start an emulator
 
-Connect your Android device via USB and enable USB debugging in
-Developer Options. Verify the connection:
+**Real phone:** connect via USB, enable USB debugging in Developer Options.
 
+**Emulator:**
 ```bash
-adb devices
+# Create AVD (one time)
+avdmanager create avd -n apksmith-test -k "system-images;android-34;google_apis;x86_64" --device pixel_6
+
+# Start emulator
+emulator -avd apksmith-test
 ```
 
-You should see your device listed. If you have multiple devices,
-note the serial number — you'll need it with `-d`.
+Verify connection:
+```bash
+adb devices
+# Should show your device/emulator as "device"
+```
 
-### 5. Pull the app
+### 5. Pull an app from the device
 
 ```bash
 apksmith pull com.example.app -o ./pulled
 ```
 
-This copies the APK from your phone to `./pulled/`. If the app uses
-split APKs (common for Play Store apps), all splits are pulled.
+Don't know the package name?
+```bash
+adb shell pm list packages | grep <keyword>
+```
 
 ### 6. Instrument (modify) the APK
 
@@ -89,9 +187,17 @@ apksmith instrument ./pulled/com.example.app_base.apk \
     --keystore-pass changeit
 ```
 
-This decompiles the APK, applies the `trace_logger` pass (which
-injects logging into every method), repacks it, and signs it. The
-output is `./out/repacked_com.example.app_base.apk`.
+Output files:
+```
+./out/
+├── com.example.app_base/         ← apktool decompiled directory
+│   └── smali/                    ← rewritten smali files are here
+│       ├── ApkSmith/
+│       │   └── InlineLogs.smali  ← injected helper class
+│       └── com/example/app/
+│           └── *.smali           ← your app's modified bytecode
+└── repacked_com.example.app_base.apk  ← the final signed APK
+```
 
 ### 7. Install the modded APK
 
@@ -99,13 +205,52 @@ output is `./out/repacked_com.example.app_base.apk`.
 apksmith install ./out/repacked_com.example.app_base.apk
 ```
 
-This uninstalls the original app and installs your modified version.
+### 8. Verify the logs
 
-**Important:** because the APK is signed with your key (not the
-original developer's), Android treats it as a different app. The old
-version must be uninstalled first, which **erases the app's data**
-(logins, settings, etc.). This is an Android security restriction,
-not an ApkSmith limitation.
+```bash
+adb logcat ApkSmith:D *:S
+```
+
+You should see lines like:
+```
+D/ApkSmith: [apphash], [Method START], [abc12345] $(7741)
+D/ApkSmith: [apphash], [Branch: if-eqz v1, :cond_0 - (line 48)], [abc12345] $(7741)
+D/ApkSmith: [apphash], [Method END], [abc12345] $(7741)
+```
+
+**Important:** the old version is auto-uninstalled because signatures
+differ. This **erases the app's data** (logins, settings). This is an
+Android restriction, not an ApkSmith limitation.
+
+## Running the tests
+
+### Unit tests (no device needed)
+
+```bash
+pytest tests/ -v
+# 39 passed — runs on any machine, no Android tools required
+```
+
+### E2E test (requires emulator + tools)
+
+The E2E test runs the full pipeline against a real emulator:
+instrument → install → launch → capture logcat → verify output.
+
+```bash
+# 1. Set up environment (see step 0)
+# 2. Build the test fixture APK (one time)
+cd tests/e2e/fixtures/hello_app
+bash build.sh
+cd ../../../..
+
+# 3. Make sure emulator is running
+adb devices
+
+# 4. Run E2E
+pytest tests/e2e/ -v -s
+```
+
+When prerequisites are missing, E2E auto-skips with a clear message.
 
 ## Commands reference
 
@@ -144,11 +289,6 @@ Pull an installed app from a connected device.
 | `-d`, `--device` | Device serial — required if multiple devices are connected |
 
 **Requires:** adb, a connected device.
-
-**Tip:** don't know the package name? Run:
-```bash
-adb shell pm list packages | grep <keyword>
-```
 
 ### `apksmith instrument <apk> -o <dir> --keystore <ks> --keystore-pass <pw>`
 
@@ -239,10 +379,11 @@ example. The pipeline handles everything else.
 
 - [x] v0.1: `trace_logger` pass + decompile/repack/sign toolchain
 - [x] v0.2: `pull` / `install` commands + `doctor` diagnostics
-- [ ] v0.3: `api_hook` pass (redirect any invoke to your stub)
-- [ ] v0.4: `const_patcher` pass (rewrite constants in place)
-- [ ] v0.5: `apksmith setup` (auto-download tools)
-- [ ] v0.6: plugin system for community-contributed passes
+- [x] v0.3: E2E test harness with emulator verification
+- [ ] v0.4: `api_hook` pass (redirect any invoke to your stub)
+- [ ] v0.5: `const_patcher` pass (rewrite constants in place)
+- [ ] v0.6: `apksmith setup` (auto-download all tools)
+- [ ] v0.7: plugin system for community-contributed passes
 - [ ] v1.0: stable API, tutorial for writing custom passes
 
 ## Origin
