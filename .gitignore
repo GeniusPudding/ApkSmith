@@ -36,3 +36,4 @@ out/
 tests/e2e/fixtures/hello_app.apk
 tests/e2e/fixtures/hello_app/build/
 tests/e2e/fixtures/debug.keystore
+*.idsig

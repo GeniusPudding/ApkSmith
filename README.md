@@ -21,143 +21,49 @@ the idea, ApkSmith handles the toolchain.
 
 ## Quick start
 
-### 0. Install the Android toolchain
+### 1. One-line setup
 
-ApkSmith needs Java, the Android SDK tools, and apktool. If you
-already have Android Studio installed, most of these are already on
-your machine — skip to step 1 and run `apksmith doctor` to check.
+Clone the repo and run the setup script. It downloads JDK, Android
+SDK, apktool, generates a signing key, and pip-installs ApkSmith —
+everything in one command.
 
-If starting from scratch, here's a fully command-line setup (no
-Android Studio needed). Adjust paths for your OS.
-
-<details>
-<summary><strong>Windows (PowerShell)</strong></summary>
-
+**Windows (PowerShell):**
 ```powershell
-# Pick an install root (any drive, not just C:)
-$root = "D:\android"
-New-Item -ItemType Directory -Force $root
-
-# 1. Portable JDK 17
-Invoke-WebRequest -Uri "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.13%2B11/OpenJDK17U-jdk_x64_windows_hotspot_17.0.13_11.zip" -OutFile "$root\jdk.zip"
-Expand-Archive "$root\jdk.zip" -DestinationPath $root -Force
-Rename-Item (Get-ChildItem $root -Directory "jdk-17.*").FullName "$root\jdk-17"
-Remove-Item "$root\jdk.zip"
-
-# 2. Android cmdline-tools
-New-Item -ItemType Directory -Force "$root\sdk\cmdline-tools"
-Invoke-WebRequest -Uri "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip" -OutFile "$root\clt.zip"
-Expand-Archive "$root\clt.zip" -DestinationPath "$root\sdk\cmdline-tools" -Force
-Rename-Item "$root\sdk\cmdline-tools\cmdline-tools" "$root\sdk\cmdline-tools\latest"
-Remove-Item "$root\clt.zip"
-
-# 3. Set up environment for this session
-$env:JAVA_HOME = "$root\jdk-17"
-$env:ANDROID_HOME = "$root\sdk"
-$env:PATH = "$env:JAVA_HOME\bin;$env:ANDROID_HOME\cmdline-tools\latest\bin;$env:PATH"
-
-# 4. Install SDK components (accept license when prompted)
-echo "y" | sdkmanager --sdk_root="$env:ANDROID_HOME" "platform-tools" "build-tools;34.0.0" "platforms;android-34"
-
-# 5. (Optional) Emulator for E2E testing
-echo "y" | sdkmanager --sdk_root="$env:ANDROID_HOME" "emulator" "system-images;android-34;google_apis;x86_64"
-New-Item -ItemType Directory -Force "$root\avd"
-$env:ANDROID_AVD_HOME = "$root\avd"
-
-# 6. Apktool
-New-Item -ItemType Directory -Force "$root\apktool"
-Invoke-WebRequest -Uri "https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.10.0.jar" -OutFile "$root\apktool\apktool.jar"
-@"
-@echo off
-"%~dp0..\jdk-17\bin\java.exe" -jar "%~dp0apktool.jar" %*
-"@ | Out-File -Encoding ascii "$root\apktool\apktool.bat"
-
-# 7. Add everything to PATH
-$env:PATH = "$root\apktool;$env:ANDROID_HOME\platform-tools;$env:ANDROID_HOME\build-tools\34.0.0;$env:ANDROID_HOME\emulator;$env:PATH"
-
-# Verify
-java -version; adb version; apktool --version
+git clone https://github.com/GeniusPudding/ApkSmith.git
+cd ApkSmith
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+# With emulator for E2E testing:
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -WithEmulator
+# Custom install path (default: D:\android):
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -Root E:\android
 ```
 
-To reload the environment in a new PowerShell session later:
-
-```powershell
-. D:\android\env.ps1
-```
-
-</details>
-
-<details>
-<summary><strong>Linux / macOS / WSL (bash)</strong></summary>
-
-```bash
-ROOT=~/android
-
-# JDK 17 (use your package manager or download from adoptium.net)
-# Ubuntu:  sudo apt install openjdk-17-jdk
-# macOS:   brew install openjdk@17
-
-# Android cmdline-tools
-mkdir -p $ROOT/sdk/cmdline-tools
-wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/clt.zip
-unzip /tmp/clt.zip -d $ROOT/sdk/cmdline-tools
-mv $ROOT/sdk/cmdline-tools/cmdline-tools $ROOT/sdk/cmdline-tools/latest
-
-export ANDROID_HOME=$ROOT/sdk
-export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
-
-yes | sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
-# Optional: emulator
-yes | sdkmanager "emulator" "system-images;android-34;google_apis;x86_64"
-
-# Apktool
-mkdir -p $ROOT/apktool
-wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.10.0.jar -O $ROOT/apktool/apktool.jar
-echo '#!/bin/bash' > $ROOT/apktool/apktool
-echo 'java -jar "$(dirname "$0")/apktool.jar" "$@"' >> $ROOT/apktool/apktool
-chmod +x $ROOT/apktool/apktool
-
-export PATH=$ROOT/apktool:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/34.0.0:$ANDROID_HOME/emulator:$PATH
-```
-
-To reload in a new session: `source ~/android/env.sh`
-
-</details>
-
-### 1. Install ApkSmith
-
+**Linux / macOS / WSL:**
 ```bash
 git clone https://github.com/GeniusPudding/ApkSmith.git
 cd ApkSmith
-pip install -e .
+bash scripts/setup.sh
+# With emulator:
+bash scripts/setup.sh --with-emulator
+# Custom install path (default: ~/android):
+bash scripts/setup.sh --root /opt/android
 ```
 
-### 2. Check your environment
+The setup script installs everything to an isolated directory (not
+your system paths), prints a verification table at the end, and
+creates an `env` script to reload in future sessions:
 
 ```bash
-apksmith doctor
+# Windows: . D:\android\env.ps1
+# Linux:   source ~/android/env.sh
 ```
 
-All required tools should show ✓. If anything is missing, see step 0.
-
-### 3. Generate a signing key (one time)
-
-```bash
-./scripts/gen_dev_keystore.sh
-```
-
-Creates `dev.keystore` with password `changeit`. Only needed once.
-
-### 4. Connect a device or start an emulator
+### 2. Connect a device or start an emulator
 
 **Real phone:** connect via USB, enable USB debugging in Developer Options.
 
-**Emulator:**
+**Emulator** (if you ran setup with `--with-emulator` / `-WithEmulator`):
 ```bash
-# Create AVD (one time)
-avdmanager create avd -n apksmith-test -k "system-images;android-34;google_apis;x86_64" --device pixel_6
-
-# Start emulator
 emulator -avd apksmith-test
 ```
 
@@ -167,7 +73,7 @@ adb devices
 # Should show your device/emulator as "device"
 ```
 
-### 5. Pull an app from the device
+### 3. Pull an app from the device
 
 ```bash
 apksmith pull com.example.app -o ./pulled
@@ -178,7 +84,7 @@ Don't know the package name?
 adb shell pm list packages | grep <keyword>
 ```
 
-### 6. Instrument (modify) the APK
+### 4. Instrument (modify) the APK
 
 ```bash
 apksmith instrument ./pulled/com.example.app_base.apk \
@@ -199,13 +105,13 @@ Output files:
 └── repacked_com.example.app_base.apk  ← the final signed APK
 ```
 
-### 7. Install the modded APK
+### 5. Install the modded APK
 
 ```bash
 apksmith install ./out/repacked_com.example.app_base.apk
 ```
 
-### 8. Verify the logs
+### 6. Verify the logs
 
 ```bash
 adb logcat ApkSmith:D *:S
@@ -224,33 +130,23 @@ Android restriction, not an ApkSmith limitation.
 
 ## Running the tests
 
-### Unit tests (no device needed)
-
 ```bash
+# Unit tests (no device needed, runs anywhere)
 pytest tests/ -v
-# 39 passed — runs on any machine, no Android tools required
-```
 
-### E2E test (requires emulator + tools)
+# E2E test (requires setup + running emulator)
+# 1. Build test fixture APK (one time)
+bash tests/e2e/fixtures/hello_app/build.sh
 
-The E2E test runs the full pipeline against a real emulator:
-instrument → install → launch → capture logcat → verify output.
+# 2. Start emulator if not running
+emulator -avd apksmith-test &
 
-```bash
-# 1. Set up environment (see step 0)
-# 2. Build the test fixture APK (one time)
-cd tests/e2e/fixtures/hello_app
-bash build.sh
-cd ../../../..
-
-# 3. Make sure emulator is running
-adb devices
-
-# 4. Run E2E
+# 3. Run E2E
 pytest tests/e2e/ -v -s
 ```
 
-When prerequisites are missing, E2E auto-skips with a clear message.
+E2E auto-skips with a clear message when prerequisites are missing,
+so `pytest tests/` is always safe to run on any machine.
 
 ## Commands reference
 
