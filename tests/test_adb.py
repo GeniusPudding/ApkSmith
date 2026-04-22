@@ -1,18 +1,15 @@
 """Tests for adb helpers and doctor."""
 
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from apksmith.toolchain.adb import (
     find_adb,
-    list_devices,
-    require_device,
     get_package_apk_paths,
+    require_device,
 )
 from apksmith.toolchain.tools import ToolNotFoundError
-from apksmith.doctor import run_doctor
 
 
 class TestFindAdb:
@@ -27,9 +24,9 @@ class TestFindAdb:
 
 class TestRequireDevice:
     def test_no_devices_raises(self):
-        with patch("apksmith.toolchain.adb.list_devices", return_value=[]):
-            with pytest.raises(RuntimeError, match="No Android devices"):
-                require_device()
+        with patch("apksmith.toolchain.adb.list_devices", return_value=[]), \
+             pytest.raises(RuntimeError, match="No Android devices"):
+            require_device()
 
     def test_single_device_auto_selects(self):
         devs = [{"serial": "emulator-5554", "state": "device"}]
@@ -41,9 +38,9 @@ class TestRequireDevice:
             {"serial": "emulator-5554", "state": "device"},
             {"serial": "ABCD1234", "state": "device"},
         ]
-        with patch("apksmith.toolchain.adb.list_devices", return_value=devs):
-            with pytest.raises(RuntimeError, match="Multiple devices"):
-                require_device()
+        with patch("apksmith.toolchain.adb.list_devices", return_value=devs), \
+             pytest.raises(RuntimeError, match="Multiple devices"):
+            require_device()
 
     def test_multiple_devices_with_serial_ok(self):
         devs = [
@@ -55,9 +52,9 @@ class TestRequireDevice:
 
     def test_serial_not_found_raises(self):
         devs = [{"serial": "emulator-5554", "state": "device"}]
-        with patch("apksmith.toolchain.adb.list_devices", return_value=devs):
-            with pytest.raises(RuntimeError, match="not found"):
-                require_device("NONEXISTENT")
+        with patch("apksmith.toolchain.adb.list_devices", return_value=devs), \
+             pytest.raises(RuntimeError, match="not found"):
+            require_device("NONEXISTENT")
 
 
 class TestGetPackagePaths:
@@ -78,9 +75,9 @@ class TestGetPackagePaths:
             assert len(paths) == 3
 
     def test_not_found_raises(self):
-        with patch("apksmith.toolchain.adb._adb", return_value=""):
-            with pytest.raises(RuntimeError, match="not found on device"):
-                get_package_apk_paths("com.fake", serial="emu")
+        with patch("apksmith.toolchain.adb._adb", return_value=""), \
+             pytest.raises(RuntimeError, match="not found on device"):
+            get_package_apk_paths("com.fake", serial="emu")
 
 
 class TestCliHelp:

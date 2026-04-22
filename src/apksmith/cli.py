@@ -19,7 +19,6 @@ from pathlib import Path
 
 from apksmith import __version__
 
-
 # ---------------------------------------------------------------------------
 # Argument parser
 # ---------------------------------------------------------------------------
@@ -38,7 +37,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "examples:\n"
             "  apksmith doctor\n"
             "  apksmith pull com.example.app -o ./pulled\n"
-            "  apksmith instrument app.apk -o out/ --keystore dev.keystore --keystore-pass changeit\n"
+            "  apksmith instrument app.apk -o out/"
+            " --keystore dev.keystore --keystore-pass changeit\n"
             "  apksmith install out/repacked_app.apk\n"
             "\n"
             "Run 'apksmith <command> --help' for command-specific options."
@@ -128,7 +128,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_install.add_argument("-d", "--device", default=None, metavar="SERIAL",
                            help="Device serial. Auto-selects if only one device.")
     p_install.add_argument("--no-uninstall", action="store_true",
-                           help="Skip automatic uninstall of the old version (will fail if signatures differ).")
+                           help=(
+                               "Skip automatic uninstall of the old version"
+                               " (will fail if signatures differ)."
+                           ))
 
     return parser
 
@@ -152,7 +155,10 @@ def _cmd_pull(args: argparse.Namespace) -> int:
     for p in paths:
         print(f"  {p}")
     if len(paths) == 1:
-        print(f"\nNext step:\n  apksmith instrument {paths[0]} -o out/ --keystore <your.keystore> --keystore-pass <pass>")
+        print(
+            f"\nNext step:\n  apksmith instrument {paths[0]}"
+            " -o out/ --keystore <your.keystore> --keystore-pass <pass>"
+        )
     return 0
 
 
@@ -162,7 +168,7 @@ def _cmd_instrument(args: argparse.Namespace) -> int:
 
     target_api_graph = {}
     if args.target_api_graph:
-        with open(args.target_api_graph, "r") as f:
+        with open(args.target_api_graph) as f:
             target_api_graph = json.load(f)
 
     config = InstrumentConfig(
@@ -198,7 +204,7 @@ def _cmd_install(args: argparse.Namespace) -> int:
         pkg = get_package_name_from_apk(args.apk[0])
         if pkg:
             print(f"Detected package: {pkg}")
-            print(f"Uninstalling old version (app data will be lost)...")
+            print("Uninstalling old version (app data will be lost)...")
             uninstall_package(pkg, serial=serial)
         else:
             print("Could not detect package name from APK (aapt/aapt2 not found).")

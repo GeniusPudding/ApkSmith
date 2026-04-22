@@ -22,7 +22,6 @@ import pytest
 from apksmith import InstrumentConfig, instrument_apk
 from apksmith.toolchain.adb import get_package_name_from_apk
 
-
 PACKAGE = "com.apksmith.test"
 MAIN_ACTIVITY = f"{PACKAGE}/.MainActivity"
 LOG_TAG = "ApkSmithE2E"
@@ -95,18 +94,28 @@ def test_instrument_install_launch_verify_logs(
     )
     assert rc == 0, f"adb install failed:\n{stdout}\n{stderr}"
 
-    # ----- 5. Clear logcat and launch the app -------------------------------
+    # ----- 5. Force-stop, clear logcat, and launch fresh --------------------
+    # force-stop ensures onCreate runs again even if the app was already
+    # in foreground from a previous test run.
+    _adb_maybe(serial, "shell", "am", "force-stop", PACKAGE)
+    time.sleep(1)
+    # Enlarge logcat buffer and clear it so our window is clean.
+    _adb_maybe(serial, "logcat", "-G", "4M")
     _adb(serial, "logcat", "-c")
+    time.sleep(1)
     _adb(serial, "shell", "am", "start", "-n", MAIN_ACTIVITY)
 
     time.sleep(LAUNCH_WAIT_SECONDS)
 
     # ----- 6. Capture logcat -----------------------------------------------
-    # Pull ALL log lines for both tags (and fatal crashes) since boot of
-    # this test — `-d` drains the buffer and returns.
-    all_logs = _adb(
-        serial, "logcat", "-d",
-        f"{LOG_TAG}:D", f"{ORIGINAL_LOG_TAG}:D", "AndroidRuntime:E", "*:S",
+    # Drain the entire logcat buffer, then filter locally. Using
+    # `logcat -d TAG:D *:S` is unreliable on some emulator images (it
+    # can return empty output even when matching lines exist), so we
+    # grab everything and grep in Python.
+    raw_logs = _adb(serial, "logcat", "-d")
+    all_logs = "\n".join(
+        line for line in raw_logs.splitlines()
+        if any(tag in line for tag in [LOG_TAG, ORIGINAL_LOG_TAG, "FATAL EXCEPTION"])
     )
 
     # ----- 7. Verify the original app still works --------------------------

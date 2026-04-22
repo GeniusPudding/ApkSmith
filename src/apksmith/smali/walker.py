@@ -71,7 +71,7 @@ def walk_smali_dir(
                 continue
 
             full_path = os.path.join(os.path.abspath(dirpath), fname)
-            with open(full_path, "r", encoding="utf-8") as f:
+            with open(full_path, encoding="utf-8") as f:
                 smali_lines = list(f)
 
             new_content = rewrite_fn(

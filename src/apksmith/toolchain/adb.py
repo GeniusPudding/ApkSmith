@@ -16,7 +16,6 @@ from pathlib import Path
 
 from apksmith.toolchain.tools import ToolNotFoundError
 
-
 # ---------------------------------------------------------------------------
 # Locator
 # ---------------------------------------------------------------------------
@@ -105,7 +104,9 @@ def require_device(serial: str | None = None, *, adb: str | None = None) -> str:
 # Package info
 # ---------------------------------------------------------------------------
 
-def get_package_apk_paths(package: str, *, serial: str | None = None, adb: str | None = None) -> list[str]:
+def get_package_apk_paths(
+    package: str, *, serial: str | None = None, adb: str | None = None,
+) -> list[str]:
     """Return the on-device paths to all APK files for *package*.
 
     Most apps have a single ``base.apk``. Apps installed via Play Store

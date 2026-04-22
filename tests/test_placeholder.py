@@ -6,6 +6,13 @@ import pytest
 
 import apksmith
 from apksmith import InstrumentConfig, InstrumentResult, InstrumentStats
+from apksmith.passes.trace_logger import (
+    _check_common_instruction_replace,
+    _emit_log,
+    _gen_method_start_log,
+    _replace_p_to_v_in_line,
+    method_logger,
+)
 from apksmith.smali.parser import (
     get_dirlist,
     get_params_list,
@@ -14,15 +21,7 @@ from apksmith.smali.parser import (
     is_target_method,
     param_registers_num,
 )
-from apksmith.passes.trace_logger import (
-    _check_common_instruction_replace,
-    _emit_log,
-    _gen_method_start_log,
-    _replace_p_to_v_in_line,
-    method_logger,
-)
-from apksmith.toolchain.tools import find_apktool, ToolNotFoundError
-
+from apksmith.toolchain.tools import ToolNotFoundError, find_apktool
 
 # ---------------------------------------------------------------------------
 # Public API surface
@@ -139,7 +138,10 @@ class TestTraceLogger:
             ".end method\n",
         ]
         collected: list[tuple[str, str]] = []
-        result = method_logger(lines, "/dummy", {}, "testhash", on_method=lambda h, s: collected.append((h, s)))
+        result = method_logger(
+            lines, "/dummy", {}, "testhash",
+            on_method=lambda h, s: collected.append((h, s)),
+        )
         assert "[Method START]" in result
         assert "[Method END]" in result
         assert len(collected) == 1

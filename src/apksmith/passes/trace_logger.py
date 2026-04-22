@@ -23,7 +23,6 @@ from collections.abc import Callable
 from typing import Any
 
 from apksmith.smali.parser import (
-    get_dirlist,
     get_params_list,
     hash_sign,
     is_non_common_instruction,
@@ -46,15 +45,20 @@ ADDITIONAL_LOCAL_COUNT = 2
 # Small helpers
 # ---------------------------------------------------------------------------
 
-_get_invoke_sign = lambda line: line.strip().split(", ")[-1].strip()
+def _get_invoke_sign(line: str) -> str:
+    return line.strip().split(", ")[-1].strip()
 
-_p2v_reg = lambda reg, locals_num: (
-    "v" + str(int(reg[1:]) + locals_num) if reg[0] == "p" else reg
-)
 
-_tag_sign = lambda line: (
-    line.strip().lstrip(":") if ":cond_" not in line else "True" + line.strip()
-)
+def _p2v_reg(reg: str, locals_num: int) -> str:
+    if reg[0] == "p":
+        return "v" + str(int(reg[1:]) + locals_num)
+    return reg
+
+
+def _tag_sign(line: str) -> str:
+    if ":cond_" not in line:
+        return line.strip().lstrip(":")
+    return "True" + line.strip()
 
 
 def _check_common_instruction_replace(line: str, locals_num: int) -> str:
@@ -91,9 +95,16 @@ def _gen_method_start_log(
     s = f'    invoke-static {{}}, {H}->genRandom()Ljava/lang/String;\n\n'
     s += f"    move-result-object {v_last2}\n\n"
     s += f'    const-string {v_last}, "[{app_hash}], [Method START], [{method_hash}] "\n\n'
-    s += f"    invoke-static/range {{{v_last} .. {v_last2}}}, {H}->stringCancate(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n\n"
+    cancate = "stringCancate(Ljava/lang/String;Ljava/lang/String;)"
+    s += (
+        f"    invoke-static/range {{{v_last} .. {v_last2}}},"
+        f" {H}->{cancate}Ljava/lang/String;\n\n"
+    )
     s += f"    move-result-object {v_last}\n\n"
-    s += f"    invoke-static/range {{{v_last}}}, {H}->monitorLog(Ljava/lang/String;)V\n\n"
+    s += (
+        f"    invoke-static/range {{{v_last}}},"
+        f" {H}->monitorLog(Ljava/lang/String;)V\n\n"
+    )
     return s
 
 
@@ -119,10 +130,17 @@ def _gen_method_params_log(locals_num: int, params_list: list[str]) -> str:
 def _emit_log(v_last: str, v_last2: str, msg: str) -> str:
     """Emit the 4-instruction log pattern used everywhere."""
     H = HELPER_CLASS
+    cancate = "stringCancate(Ljava/lang/String;Ljava/lang/String;)"
     s = f'    const-string {v_last}, "{msg}"\n\n'
-    s += f"    invoke-static/range {{{v_last} .. {v_last2}}}, {H}->stringCancate(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n\n"
+    s += (
+        f"    invoke-static/range {{{v_last} .. {v_last2}}},"
+        f" {H}->{cancate}Ljava/lang/String;\n\n"
+    )
     s += f"    move-result-object {v_last}\n\n"
-    s += f"    invoke-static/range {{{v_last}}}, {H}->monitorLog(Ljava/lang/String;)V\n\n"
+    s += (
+        f"    invoke-static/range {{{v_last}}},"
+        f" {H}->monitorLog(Ljava/lang/String;)V\n\n"
+    )
     return s
 
 
@@ -203,10 +221,12 @@ def method_logger(
             elif line.startswith("    invoke"):
                 invoke_sign = _get_invoke_sign(line)
                 if is_target_method(invoke_sign, smali_base_dir, target_api_graph):
-                    new_content += _emit_log(
-                        v_last, v_last2,
-                        f"[{app_hash}], [TARGET API CALL: {invoke_sign} - (line {i})], [{method_hash}] ",
+                    msg = (
+                        f"[{app_hash}], [TARGET API CALL:"
+                        f" {invoke_sign} - (line {i})],"
+                        f" [{method_hash}] "
                     )
+                    new_content += _emit_log(v_last, v_last2, msg)
 
             elif line.startswith("    if-"):
                 output_flag = 0
@@ -243,10 +263,11 @@ def method_logger(
                         new_content += _emit_log(v_last, v_last2, tag_str)
                         new_content += line + "\n"
 
-                    elif line.startswith("    :sswitch_data") or line.startswith("    :pswitch_data"):
-                        new_content += line + "\n"
-
-                    elif line.startswith("    :array"):
+                    elif (
+                        line.startswith("    :sswitch_data")
+                        or line.startswith("    :pswitch_data")
+                        or line.startswith("    :array")
+                    ):
                         new_content += line + "\n"
 
                     elif line.startswith("    :catch"):

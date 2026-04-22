@@ -15,7 +15,6 @@ from pathlib import Path
 
 import pytest
 
-
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 HELLO_APK = FIXTURE_DIR / "hello_app.apk"
 DEBUG_KEYSTORE = FIXTURE_DIR / "debug.keystore"

@@ -42,7 +42,8 @@ def run_doctor() -> int:
         ("Python", [sys.executable], ["--version"], True),
         ("Java", ["java"], ["-version"], True),
         ("apktool", ["apktool", "apktool.bat"], ["--version"], True),
-        ("zipalign", ["zipalign"], ["-h"], True),  # zipalign has no --version; -h exits 1 but prints info
+        # zipalign has no --version; -h exits 1 but prints info
+        ("zipalign", ["zipalign"], ["-h"], True),
         ("apksigner", ["apksigner", "apksigner.bat"], ["version"], True),
         ("adb", ["adb"], ["version"], True),
         ("keytool", ["keytool"], ["-help"], False),
@@ -82,9 +83,9 @@ def run_doctor() -> int:
                 serials = ", ".join(d["serial"] for d in online)
                 print(f"\n  Devices      {len(online)} connected: {serials}")
             else:
-                print(f"\n  Devices      0 connected (connect a device or start an emulator)")
+                print("\n  Devices      0 connected (connect a device or start an emulator)")
         except Exception:
-            print(f"\n  Devices      (could not query)")
+            print("\n  Devices      (could not query)")
 
     print()
     if all_required_ok:

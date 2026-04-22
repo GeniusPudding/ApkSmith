@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import importlib.resources
 import os
-import shutil
 from pathlib import Path
 
 from apksmith.config import InstrumentConfig

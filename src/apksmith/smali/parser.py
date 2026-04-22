@@ -7,8 +7,6 @@ code, console debugging artefacts, and ``rich`` dependency.
 from __future__ import annotations
 
 import hashlib
-import re
-
 
 # ---------------------------------------------------------------------------
 # Hashing
@@ -80,7 +78,10 @@ def get_params_list(line: str, class_sign: str | None = None) -> list[str]:
 
 
 def is_non_common_instruction(smali_line: str) -> bool:
-    """True for directives, labels, comments, blank lines — anything that is NOT a regular Dalvik instruction."""
+    """True for directives, labels, comments, blank lines.
+
+    Anything that is NOT a regular Dalvik instruction.
+    """
     return (
         any(smali_line.startswith(e) for e in ["    .", "    :", "    #", ".", "     "])
         or smali_line.strip() == ""
